@@ -1,0 +1,509 @@
+[
+    {
+        "id": "fe979427d84c0d21",
+        "type": "tab",
+        "label": "PMS FINAL OLD alternator ASSY-2",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "cb6690be7f56485c",
+        "type": "inject",
+        "z": "fe979427d84c0d21",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "10",
+        "payloadType": "num",
+        "x": 110,
+        "y": 80,
+        "wires": [
+            [
+                "d1f356de0e4eb5ef",
+                "0e369fc0611ec89d"
+            ]
+        ]
+    },
+    {
+        "id": "d1f356de0e4eb5ef",
+        "type": "FINS Read Multiple",
+        "z": "fe979427d84c0d21",
+        "name": "CJ series PLC of Alternator Assy2: Final cover titghting",
+        "connection": "4157ba72be5e6d2a",
+        "addressType": "str",
+        "address": "D89",
+        "msgPropertyType": "msg",
+        "msgProperty": "payload",
+        "outputFormatType": "signed",
+        "outputFormat": "",
+        "x": 420,
+        "y": 60,
+        "wires": [
+            [
+                "995cee9f2dda9753"
+            ]
+        ]
+    },
+    {
+        "id": "995cee9f2dda9753",
+        "type": "rbe",
+        "z": "fe979427d84c0d21",
+        "name": "RBE",
+        "func": "rbe",
+        "gap": "",
+        "start": "",
+        "inout": "out",
+        "septopics": true,
+        "property": "payload",
+        "topi": "topic",
+        "x": 450,
+        "y": 120,
+        "wires": [
+            [
+                "2825e7101fc0bd17",
+                "f64a0d8732693225"
+            ]
+        ]
+    },
+    {
+        "id": "2825e7101fc0bd17",
+        "type": "debug",
+        "z": "fe979427d84c0d21",
+        "name": "debug 19",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 740,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "8f1d7aae8eacb956",
+        "type": "inject",
+        "z": "fe979427d84c0d21",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "00 14 * * *",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 130,
+        "y": 200,
+        "wires": [
+            [
+                "fc9ae0a4a1234bd1"
+            ]
+        ]
+    },
+    {
+        "id": "fc9ae0a4a1234bd1",
+        "type": "FINS Fill",
+        "z": "fe979427d84c0d21",
+        "name": "",
+        "connection": "4157ba72be5e6d2a",
+        "addressType": "str",
+        "address": "D89",
+        "valueType": "num",
+        "value": "0",
+        "countType": "num",
+        "count": "1",
+        "msgPropertyType": "str",
+        "msgProperty": "payload",
+        "x": 330,
+        "y": 200,
+        "wires": [
+            [
+                "2825e7101fc0bd17"
+            ]
+        ]
+    },
+    {
+        "id": "04c25b3ee5e9c1de",
+        "type": "debug",
+        "z": "fe979427d84c0d21",
+        "name": "debug 20",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 860,
+        "y": 940,
+        "wires": []
+    },
+    {
+        "id": "c9f58cf1c6b014e3",
+        "type": "inject",
+        "z": "fe979427d84c0d21",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "20",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "num",
+        "x": 150,
+        "y": 940,
+        "wires": [
+            [
+                "91ce8e9d5453ba32"
+            ]
+        ]
+    },
+    {
+        "id": "91ce8e9d5453ba32",
+        "type": "function",
+        "z": "fe979427d84c0d21",
+        "name": "ct counter final",
+        "func": "// Current Time\nlet now = new Date();\nlet hours = now.getHours();\nlet minutes = now.getMinutes();\nlet seconds = now.getSeconds();\nlet totalSeconds = (hours * 3600) + (minutes * 60) + seconds;\n\n// Shift Times\nlet resetTimes = [\n    { start: 6 * 3600, end: 14 * 3600 },               // A Shift\n    { start: 14 * 3600, end: 22 * 3600 },              // B Shift\n    { start: 22 * 3600, end: (24 + 6) * 3600 }         // C Shift (10PM–6AM)\n];\n\n// Shift-wise Break Times (with explicit format)\nlet shiftBreaks = [\n    [   // A shift breaks\n        { start: (7 * 3600) + (30 * 60), end: (7 * 3600) + (40 * 60) },     // 7:30–7:40\n        { start: (11 * 3600), end: (11 * 3600) + (30 * 60) },              // 11:00–11:30\n        { start: (12 * 3600) + (30 * 60), end: (12 * 3600) + (40 * 60) }   // 12:30–12:40\n    ],\n    [   // B shift breaks\n        { start: (15 * 3600) + (30 * 60), end: (15 * 3600) + (40 * 60) },  // 15:30–15:40\n        { start: (19 * 3600), end: (19 * 3600) + (30 * 60) },              // 19:00–19:30\n        { start: (20 * 3600) + (30 * 60), end: (20 * 3600) + (40 * 60) }  // 20:30–20:40\n    ],\n    [   // C shift breaks\n        { start: (23 * 3600) + (30 * 60), end: (23 * 3600) + (40 * 60) },  // 23:30–23:40\n        { start: (2 * 3600), end: (2 * 3600) + (30 * 60) },               // 2:00–2:30 AM\n        { start: (4 * 3600) + (30 * 60), end: (4 * 3600) + (40 * 60) }, //4:00-4:30 AM\n    ]\n];\n\n// CT (Cycle Time)\nlet cycleTime = 26.3;\n\n// Adjust totalSeconds if before 6:00 AM (C shift continues past midnight)\nlet adjustedTotalSeconds = totalSeconds;\nif (totalSeconds < 6 * 3600) {\n    adjustedTotalSeconds += 86400;\n}\n\nlet units = 0;\n\n// Loop over shifts\nfor (let i = 0; i < resetTimes.length; i++) {\n    let start = resetTimes[i].start;\n    let end = resetTimes[i].end;\n\n    // Adjust for midnight crossover\n    let shiftStart = start;\n    let shiftEnd = end;\n    if (end > 86400) {\n        if (adjustedTotalSeconds >= start || adjustedTotalSeconds < (end - 86400)) {\n            if (adjustedTotalSeconds < start) adjustedTotalSeconds += 86400;\n            shiftEnd += 86400;\n        } else {\n            continue;\n        }\n    } else {\n        if (!(adjustedTotalSeconds >= start && adjustedTotalSeconds < end)) {\n            continue;\n        }\n    }\n\n    // Get shift-specific break times\n    let breaks = shiftBreaks[i];\n    let breakDuration = 0;\n\n    for (let b of breaks) {\n        let breakStart = b.start;\n        let breakEnd = b.end;\n\n        // Adjust break for post-midnight\n        if (breakEnd < breakStart) breakEnd += 86400;\n        if (breakStart < start) breakStart += 86400;\n        if (breakEnd < start) breakEnd += 86400;\n\n        if (adjustedTotalSeconds > breakStart) {\n            let overlapEnd = Math.min(adjustedTotalSeconds, breakEnd);\n            if (overlapEnd > breakStart) {\n                breakDuration += overlapEnd - breakStart;\n            }\n        }\n    }\n\n    let planTime = adjustedTotalSeconds - start - breakDuration;\n    if (planTime < 0) planTime = 0;\n\n    units = Math.floor(planTime / cycleTime);\n    break;\n}\n\nmsg.payload = units;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 320,
+        "y": 940,
+        "wires": [
+            [
+                "56857ac7207c5423"
+            ]
+        ]
+    },
+    {
+        "id": "56857ac7207c5423",
+        "type": "function",
+        "z": "fe979427d84c0d21",
+        "name": "function 18",
+        "func": "msg.payload = {\n    plan: msg.payload,         // incoming value will be saved as \"plan\"\n    timestamp: new Date()      // optional: adds timestamp for each entry\n};\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 490,
+        "y": 940,
+        "wires": [
+            [
+                "04c25b3ee5e9c1de",
+                "3349293829d7ab8b"
+            ]
+        ]
+    },
+    {
+        "id": "3349293829d7ab8b",
+        "type": "mongodb out",
+        "z": "fe979427d84c0d21",
+        "mongodb": "4bd9cdc8b16a475b",
+        "name": "a",
+        "collection": "plan",
+        "payonly": true,
+        "upsert": false,
+        "multi": false,
+        "operation": "insert",
+        "x": 730,
+        "y": 840,
+        "wires": []
+    },
+    {
+        "id": "e8e0e5b68ade6f83",
+        "type": "comment",
+        "z": "fe979427d84c0d21",
+        "name": "Plan of CT",
+        "info": "complete",
+        "x": 160,
+        "y": 860,
+        "wires": []
+    },
+    {
+        "id": "d46742f912cdab49",
+        "type": "comment",
+        "z": "fe979427d84c0d21",
+        "name": "Actual Data",
+        "info": "",
+        "x": 130,
+        "y": 20,
+        "wires": []
+    },
+    {
+        "id": "640e4a8f85fc8fd9",
+        "type": "inject",
+        "z": "fe979427d84c0d21",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "00 22 * * *",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 130,
+        "y": 240,
+        "wires": [
+            [
+                "fc9ae0a4a1234bd1"
+            ]
+        ]
+    },
+    {
+        "id": "f2be3d61f7f253cc",
+        "type": "inject",
+        "z": "fe979427d84c0d21",
+        "name": "",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "00 06 * * *",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 130,
+        "y": 280,
+        "wires": [
+            [
+                "fc9ae0a4a1234bd1"
+            ]
+        ]
+    },
+    {
+        "id": "f64a0d8732693225",
+        "type": "function",
+        "z": "fe979427d84c0d21",
+        "name": "function 21",
+        "func": "// Get previous time from context\nlet lastTime = context.get('lastTime') || Date.now();\n\n// Current time\nlet currentTime = Date.now();\n\n// Calculate time difference in seconds\nlet secondsPassed = Math.floor((currentTime - lastTime) / 1000);\n\n// Save current time for next message\ncontext.set('lastTime', currentTime);\n\n// Prepare new payload\nmsg.payload = {\n    count: msg.payload[0],       // extract number from array\n    second: secondsPassed,       // time difference in seconds\n    timestamp: new Date()        // current timestamp\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 810,
+        "y": 280,
+        "wires": [
+            [
+                "c8c993281cd12be9",
+                "a813d31be4f3fa08"
+            ]
+        ]
+    },
+    {
+        "id": "e59e73be1003bc15",
+        "type": "mongodb in",
+        "z": "fe979427d84c0d21",
+        "mongodb": "mongodb_config",
+        "name": "Get CT from Alternator Assy 2",
+        "collection": "CT",
+        "operation": "find",
+        "x": 370,
+        "y": 440,
+        "wires": [
+            [
+                "36455fa1d0dcb7d7"
+            ]
+        ]
+    },
+    {
+        "id": "c8c993281cd12be9",
+        "type": "debug",
+        "z": "fe979427d84c0d21",
+        "name": "debug 25",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1100,
+        "y": 280,
+        "wires": []
+    },
+    {
+        "id": "46ce22b020da84ad",
+        "type": "mongodb out",
+        "z": "fe979427d84c0d21",
+        "mongodb": "4bd9cdc8b16a475b",
+        "name": "a",
+        "collection": "pm",
+        "payonly": true,
+        "upsert": false,
+        "multi": false,
+        "operation": "insert",
+        "x": 1022.7083129882812,
+        "y": 142.6984100341797,
+        "wires": []
+    },
+    {
+        "id": "0e369fc0611ec89d",
+        "type": "function",
+        "z": "fe979427d84c0d21",
+        "name": "Trigger Random Delay",
+        "func": "// Trigger a random delay between 10 to 20 seconds\n//const minInterval = 10;\n//const maxInterval = 20;\n\n//const nextDelay = Math.floor(Math.random() * (maxInterval - minInterval + 1) + minInterval) * 1000;\n\n//setTimeout(() => {\n //   node.send(msg);\n//}, nextDelay);\n\n//return null;\nif (!context.get('started')) {\n    context.set('started', true);\n\n    const triggerLoop = () => {\n        node.send({ payload: \"Triggered at \" + new Date().toISOString() });\n\n        setTimeout(triggerLoop, 20000);  // 20 sec\n    };\n\n    triggerLoop(); // start loop\n}\n\nreturn null;\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 220,
+        "y": 360,
+        "wires": [
+            [
+                "e59e73be1003bc15"
+            ]
+        ]
+    },
+    {
+        "id": "36455fa1d0dcb7d7",
+        "type": "function",
+        "z": "fe979427d84c0d21",
+        "name": "Prepare Output",
+        "func": "//const minInterval = 10;\n//const maxInterval = 20;\n\n//let count = context.get('count') || 0;\n//let lastTime = context.get('lastTime') || Date.now();\n\n// Update count\n//count++;\n//context.set('count', count);\n\n// Calculate seconds since last output\n//let currentTime = Date.now();\n//let secondsSinceLast = Math.floor((currentTime - lastTime) / 1000);\n//context.set('lastTime', currentTime);\n\n// Get CT value\nlet ctValue = null;\nif (msg.payload && msg.payload[0] && typeof msg.payload[0].CT === 'number') {\n    ctValue = msg.payload[0].CT;\n}\n\n// Output payload\nlet output = {\n    //count: count,\n    //second: secondsSinceLast,\n    second2: ctValue,\n    timestamp: new Date()\n};\n\nmsg.payload = output;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 640,
+        "y": 440,
+        "wires": [
+            [
+                "6ec03fc9e1cbb0eb",
+                "a813d31be4f3fa08"
+            ]
+        ]
+    },
+    {
+        "id": "6ec03fc9e1cbb0eb",
+        "type": "debug",
+        "z": "fe979427d84c0d21",
+        "name": "debug 26",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 920,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "a813d31be4f3fa08",
+        "type": "function",
+        "z": "fe979427d84c0d21",
+        "name": "function 22",
+        "func": "// Get buffer from context\nlet buffer = context.get('buffer') || {};\n\n// Check what values are present in this incoming payload\nif ('count' in msg.payload && 'second' in msg.payload) {\n    buffer.count = msg.payload.count;\n    buffer.second = msg.payload.second;\n}\n\nif ('second2' in msg.payload) {\n    buffer.second2 = msg.payload.second2;\n}\n\n// Save updated buffer\ncontext.set('buffer', buffer);\n\n// Check if all required values are available\nif (buffer.count !== undefined && buffer.second !== undefined && buffer.second2 !== undefined) {\n    // Prepare final payload with only values\n    let finalPayload = {\n        count: buffer.count,\n        second: buffer.second,\n        second2: buffer.second2,\n        timestamp: new Date()\n    };\n\n    // Reset buffer for next cycle\n    context.set('buffer', {});\n\n    msg.payload = finalPayload;\n    return msg;\n}\n\n// Wait for all data to arrive\nreturn null;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 890,
+        "y": 680,
+        "wires": [
+            [
+                "99210cffaee6dbe6",
+                "46ce22b020da84ad"
+            ]
+        ]
+    },
+    {
+        "id": "99210cffaee6dbe6",
+        "type": "debug",
+        "z": "fe979427d84c0d21",
+        "name": "debug 27",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 1090,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "4157ba72be5e6d2a",
+        "type": "FINS Connection",
+        "name": "",
+        "host": "192.168.250.4",
+        "port": "9600",
+        "MODE": "",
+        "MODEType": "CJ",
+        "protocol": "",
+        "protocolType": "tcp",
+        "ICF": "",
+        "DNA": "",
+        "DA1": "3",
+        "DA2": "",
+        "SNA": "",
+        "SA1": "99",
+        "SA2": "",
+        "autoConnect": true
+    },
+    {
+        "id": "4bd9cdc8b16a475b",
+        "type": "mongodb",
+        "hostname": "localhost",
+        "topology": "direct",
+        "connectOptions": "",
+        "port": "27017",
+        "db": "mld",
+        "name": ""
+    },
+    {
+        "id": "mongodb_config",
+        "type": "mongodb",
+        "hostname": "localhost",
+        "topology": "direct",
+        "connectOptions": "",
+        "port": "27017",
+        "db": "mld",
+        "name": "MongoDB mld"
+    }
+]
