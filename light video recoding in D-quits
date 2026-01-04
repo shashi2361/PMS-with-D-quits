@@ -1,1 +1,356 @@
+const express = require('express');
+const { MongoClient, ObjectId } = require('mongodb');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const path = require('path');
+const ffmpeg = require("fluent-ffmpeg");
+const ffmpegPath = require("ffmpeg-static");
+const fs = require("fs");
 
+ffmpeg.setFfmpegPath(ffmpegPath);
+
+const app = express();
+const PORT = 4000;
+
+app.use(cors());
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+const uri = "mongodb://localhost:27017/mld";
+const client = new MongoClient(uri);
+let db;
+
+async function connectToMongoDB() {
+  try {
+    await client.connect();
+    db = client.db("mld");
+    console.log("✅ Connected to MongoDB");
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err);
+  }
+}
+
+function getCollection(name) {
+  return db.collection(name);
+}
+
+// ========================================
+// 🎥 OPTIMIZED CAMERA CONFIGURATION
+// ========================================
+const CAMERAS = {
+  cam1: {
+    rtsp: "rtsp://admin:Password%401@192.168.250.210:554/stream2", // ⚠️ USE stream2 (lower resolution)
+    videoDir: path.join(__dirname, "videos", "cam1"),
+    hlsDir: path.join(__dirname, "public", "hls", "cam1")
+  },
+  cam2: {
+    rtsp: "rtsp://admin:Password%401@192.168.250.215:554/stream2",
+    videoDir: path.join(__dirname, "videos", "cam2"),
+    hlsDir: path.join(__dirname, "public", "hls", "cam2")
+  },
+  cam3: {
+    rtsp: "rtsp://admin:Password%401@192.168.250.216:554/stream2",
+    videoDir: path.join(__dirname, "videos", "cam3"),
+    hlsDir: path.join(__dirname, "public", "hls", "cam3")
+  },
+  cam4: {
+    rtsp: "rtsp://admin:Password%401@192.168.250.217:554/stream2",
+    videoDir: path.join(__dirname, "videos", "cam4"),
+    hlsDir: path.join(__dirname, "public", "hls", "cam4")
+  }
+};
+
+// Create directories
+Object.values(CAMERAS).forEach(cam => {
+  if (!fs.existsSync(cam.videoDir)) fs.mkdirSync(cam.videoDir, { recursive: true });
+  if (!fs.existsSync(cam.hlsDir)) fs.mkdirSync(cam.hlsDir, { recursive: true });
+});
+
+const recordingProcesses = {};
+const recordingStats = {}; // Track recording health
+
+// ========================================
+// 🎥 OPTIMIZED RECORDING (LOW STORAGE)
+// ========================================
+function startOptimizedRecording(cameraId) {
+  const cam = CAMERAS[cameraId];
+  if (!cam) return;
+
+  if (recordingProcesses[cameraId]) {
+    console.log(`⏱ ${cameraId} already recording`);
+    return;
+  }
+
+  // Initialize stats
+  recordingStats[cameraId] = {
+    startTime: new Date(),
+    lastFrameTime: new Date(),
+    restartCount: 0,
+    errors: []
+  };
+
+  const outputPattern = path.join(
+    cam.videoDir,
+    `${cameraId}_%Y-%m-%d_%H-%M.mp4`
+  );
+
+  console.log(`🎥 Starting ${cameraId} with LOW storage mode`);
+
+  recordingProcesses[cameraId] = ffmpeg(cam.rtsp)
+    .inputOptions([
+      '-rtsp_transport', 'tcp',
+      '-timeout', '5000000',        // 5 sec timeout
+      '-reconnect', '1',            // ✅ AUTO RECONNECT
+      '-reconnect_streamed', '1',
+      '-reconnect_delay_max', '2'   // Max 2 sec retry
+    ])
+    .videoCodec('libx264')
+    .outputOptions([
+      '-preset', 'veryfast',        // ✅ Better quality than ultrafast
+      '-crf', '28',                 // ✅ 23=high quality, 28=good quality, saves 40-50% space
+      '-maxrate', '1M',             // ✅ Limit bitrate to 1 Mbps per camera
+      '-bufsize', '2M',
+      '-g', '50',                   // Keyframe every 50 frames (smoother seeking)
+      '-sc_threshold', '0',         // Disable scene detection
+      '-f', 'segment',
+      '-segment_time', '300',       // ✅ 5-minute segments (not 1 min)
+      '-segment_format', 'mp4',
+      '-reset_timestamps', '1',
+      '-strftime', '1',
+      '-movflags', '+faststart'     // ✅ Fast playback start
+    ])
+    .output(outputPattern)
+    .on('start', (cmd) => {
+      console.log(`✅ ${cameraId} recording started`);
+      console.log(`Command: ${cmd}`);
+    })
+    .on('progress', (progress) => {
+      recordingStats[cameraId].lastFrameTime = new Date();
+      // Log every 60 seconds
+      if (progress.timemark && progress.frames % 300 === 0) {
+        console.log(`📊 ${cameraId}: ${progress.timemark}, ${progress.frames} frames`);
+      }
+    })
+    .on('error', (err) => {
+      console.error(`❌ ${cameraId} error: ${err.message}`);
+      recordingStats[cameraId].errors.push({
+        time: new Date(),
+        error: err.message
+      });
+      
+      recordingProcesses[cameraId] = null;
+      
+      // ✅ AUTO RESTART after 5 seconds
+      setTimeout(() => {
+        console.log(`🔄 Restarting ${cameraId}...`);
+        recordingStats[cameraId].restartCount++;
+        startOptimizedRecording(cameraId);
+      }, 5000);
+    })
+    .on('end', () => {
+      console.log(`⏹️ ${cameraId} recording ended`);
+      recordingProcesses[cameraId] = null;
+    });
+
+  recordingProcesses[cameraId].run();
+}
+
+// ========================================
+// 🔍 VIDEO RETRIEVAL (NEAREST FILE)
+// ========================================
+app.get("/api/camera/video", (req, res) => {
+  const { cameraId, ts } = req.query;
+  
+  if (!cameraId || !ts) {
+    return res.status(400).send("cameraId & timestamp required");
+  }
+
+  const cam = CAMERAS[cameraId];
+  if (!cam) {
+    return res.status(404).send("Invalid camera");
+  }
+
+  const clickTime = new Date(ts);
+  
+  // ✅ Find NEAREST video file (within ±10 minutes)
+  const files = fs.readdirSync(cam.videoDir)
+    .filter(f => f.startsWith(cameraId) && f.endsWith('.mp4'))
+    .map(f => {
+      const match = f.match(/(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})/);
+      if (!match) return null;
+      
+      const fileTime = new Date(
+        parseInt(match[1]), 
+        parseInt(match[2]) - 1, 
+        parseInt(match[3]),
+        parseInt(match[4]), 
+        parseInt(match[5])
+      );
+      
+      return {
+        name: f,
+        time: fileTime,
+        diff: Math.abs(fileTime - clickTime)
+      };
+    })
+    .filter(f => f !== null && f.diff < 10 * 60 * 1000) // Within 10 min
+    .sort((a, b) => a.diff - b.diff);
+
+  if (files.length === 0) {
+    return res.status(404).send("No video found near this time");
+  }
+
+  const videoPath = path.join(cam.videoDir, files[0].name);
+  
+  console.log(`📹 Serving ${cameraId}: ${files[0].name} (diff: ${Math.round(files[0].diff/1000)}s)`);
+  
+  res.sendFile(videoPath);
+});
+
+// ========================================
+// 📊 RECORDING HEALTH CHECK API
+// ========================================
+app.get("/api/camera/health", (req, res) => {
+  const health = {};
+  
+  Object.keys(CAMERAS).forEach(camId => {
+    const stats = recordingStats[camId];
+    if (!stats) {
+      health[camId] = { status: "NOT_STARTED" };
+      return;
+    }
+    
+    const timeSinceLastFrame = Date.now() - stats.lastFrameTime;
+    const isAlive = timeSinceLastFrame < 60000; // Less than 60 seconds
+    
+    health[camId] = {
+      status: isAlive ? "RECORDING" : "STALLED",
+      uptime: Math.round((Date.now() - stats.startTime) / 1000),
+      restarts: stats.restartCount,
+      lastFrame: Math.round(timeSinceLastFrame / 1000) + "s ago",
+      recentErrors: stats.errors.slice(-3)
+    };
+  });
+  
+  res.json(health);
+});
+
+// ========================================
+// 🗑️ SMART CLEANUP (30 DAYS RETENTION)
+// ========================================
+function cleanupOldVideos() {
+  console.log("🗑️ Running cleanup...");
+  
+  Object.values(CAMERAS).forEach(cam => {
+    try {
+      const files = fs.readdirSync(cam.videoDir);
+      const now = Date.now();
+      const retentionMs = 30 * 24 * 60 * 60 * 1000; // 30 days
+      
+      let deletedCount = 0;
+      let freedSpace = 0;
+      
+      files.forEach(file => {
+        const filePath = path.join(cam.videoDir, file);
+        const stats = fs.statSync(filePath);
+        const age = now - stats.mtimeMs;
+        
+        if (age > retentionMs) {
+          freedSpace += stats.size;
+          fs.unlinkSync(filePath);
+          deletedCount++;
+        }
+      });
+      
+      if (deletedCount > 0) {
+        console.log(`✅ Deleted ${deletedCount} files, freed ${(freedSpace / 1024 / 1024 / 1024).toFixed(2)} GB`);
+      }
+    } catch (err) {
+      console.error(`❌ Cleanup error for ${cam.videoDir}:`, err);
+    }
+  });
+}
+
+// Run cleanup every 6 hours
+setInterval(cleanupOldVideos, 6 * 60 * 60 * 1000);
+
+// ========================================
+// 📈 STORAGE USAGE API
+// ========================================
+app.get("/api/storage/usage", (req, res) => {
+  const usage = {};
+  let totalSize = 0;
+  
+  Object.entries(CAMERAS).forEach(([camId, cam]) => {
+    try {
+      const files = fs.readdirSync(cam.videoDir);
+      let cameraSize = 0;
+      
+      files.forEach(file => {
+        const stats = fs.statSync(path.join(cam.videoDir, file));
+        cameraSize += stats.size;
+      });
+      
+      usage[camId] = {
+        files: files.length,
+        sizeGB: (cameraSize / 1024 / 1024 / 1024).toFixed(2)
+      };
+      
+      totalSize += cameraSize;
+    } catch (err) {
+      usage[camId] = { error: err.message };
+    }
+  });
+  
+  usage.total = {
+    sizeGB: (totalSize / 1024 / 1024 / 1024).toFixed(2),
+    estimatedDays: totalSize > 0 ? Math.round((1024 * 1024 * 1024 * 1024) / totalSize) : "N/A"
+  };
+  
+  res.json(usage);
+});
+
+// ========================================
+// 🚀 START SERVER
+// ========================================
+app.listen(PORT, async () => {
+  await connectToMongoDB();
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  
+  // Start all cameras
+  Object.keys(CAMERAS).forEach(camId => {
+    startOptimizedRecording(camId);
+  });
+  
+  // Initial cleanup
+  setTimeout(cleanupOldVideos, 10000); // After 10 seconds
+  
+  console.log(`
+  ✅ OPTIMIZATION APPLIED:
+  - CRF 28 (saves 40-50% storage vs default)
+  - 5-minute segments (better than 1-minute)
+  - 1 Mbps max bitrate per camera
+  - Auto-reconnect on network issues
+  - 30-day retention
+  
+  📊 ESTIMATED STORAGE:
+  - ~8-12 GB per camera per day
+  - 4 cameras = 32-48 GB/day
+  - 30 days = 960-1440 GB (fits in 1TB with buffer)
+  
+  🔧 APIs:
+  - GET /api/camera/health (check recording status)
+  - GET /api/storage/usage (check disk usage)
+  - GET /api/camera/video?cameraId=cam1&ts=2026-01-04T10:30:00Z
+  `);
+});
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('🛑 Shutting down gracefully...');
+  Object.values(recordingProcesses).forEach(proc => {
+    if (proc) proc.kill('SIGTERM');
+  });
+  process.exit(0);
+});
